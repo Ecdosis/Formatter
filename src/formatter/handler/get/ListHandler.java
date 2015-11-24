@@ -208,7 +208,11 @@ public class ListHandler extends FormatterGetHandler
             styles = new String[1];
             styles[0] = "list/default";
         }
+        ArrayList<String> styleNames = new ArrayList<String>();
+        for ( int i=0;i<styles.length;i++ )
+            styleNames.add(styles[i]);
         docid = request.getParameter( Params.DOCID );
+        version1 = request.getParameter(Params.VERSION1);
         try
         {
             String table = getVersionTableForUrn( docid );
@@ -220,7 +224,7 @@ public class ListHandler extends FormatterGetHandler
             String markup = markupVersionTable( table, listName, listId );
             String[] corcodes = new String[1];
             corcodes[0] = markup;
-            String[] css = fetchStyles( styles );
+            String[] css = fetchStyles( styleNames );
             JSONResponse html = new JSONResponse(JSONResponse.HTML );
             //System.out.println("about to format list");
             int res = new AeseFormatter().format( table, 

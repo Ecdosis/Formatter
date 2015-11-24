@@ -28,7 +28,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import calliope.core.Utils;
 import calliope.core.database.Connector;
-import calliope.core.handler.AeseVersion;
+import calliope.core.handler.EcdosisVersion;
 import calliope.core.constants.Database;
 import calliope.core.constants.Formats;
 import calliope.core.constants.JSONKeys;
@@ -39,12 +39,9 @@ import calliope.json.corcode.Range;
 import calliope.json.corcode.STILDocument;
 import edu.luc.nmerge.mvd.MVD;
 import edu.luc.nmerge.mvd.MVDFile;
-import edu.luc.nmerge.mvd.Pair;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
+import java.util.Arrays;
 import html.Comment;
 import java.util.BitSet;
 import org.json.simple.JSONObject;
@@ -56,6 +53,8 @@ import org.json.simple.JSONValue;
  */
 public class FormatterGetHandler extends FormatterHandler
 {
+    /** optional section ranges */
+    String selections;
     public void handle(HttpServletRequest request,
             HttpServletResponse response, String urn) throws FormatterException 
     {
@@ -190,10 +189,10 @@ public class FormatterGetHandler extends FormatterHandler
      * @return the CorTex/CorCode version contents or null if not found
      * @throws AeseException if the resource couldn't be found for some reason
      */
-    protected AeseVersion doGetResourceVersion( String db, String docID, 
+    protected EcdosisVersion doGetResourceVersion( String db, String docID, 
         String vPath ) throws FormatterException
     {
-        AeseVersion version = new AeseVersion();
+        EcdosisVersion version = new EcdosisVersion();
         JSONObject doc = null;
         char[] data = null;
         String res = null;
@@ -261,69 +260,6 @@ public class FormatterGetHandler extends FormatterHandler
         return version;
     }
     /**
-     * Get an enumerated set of parameters prefix&lt;N&gt;
-     * @param prefix each parameter in the set starts with this
-     * @param map the request's param map
-     * @return an array of parameter values indexed by param's number
-     * @param addDefault add a "default" value if none found
-     * @throws a AeseParamException if a parameter was wrongly specified
-     */
-    protected String[] getEnumeratedParams( String prefix, Map map, 
-        boolean addDefault ) throws FormatterException
-    {
-        ArrayList<String> array = new ArrayList<String>();
-        Set keys = map.keySet();
-        Iterator iter = keys.iterator();
-        // get relevant param keys
-        while ( iter.hasNext() )
-        {
-            String key = (String) iter.next();
-            if ( key.startsWith(prefix) )
-                array.add( (String)map.get(key) );
-        }
-        String[] params;
-        if ( array.isEmpty() )
-        {
-            if ( addDefault )
-                array.add( Formats.DEFAULT ); 
-            params = new String[array.size()];
-            array.toArray( params );
-        }
-        else
-        {
-            params = new String[array.size()];
-            // get their values in a properly indexed array
-            for ( int i=0;i<array.size();i++ )
-            {
-                String number = array.get(i).substring(prefix.length());
-                int index = 0;
-                if ( number.length() == 0 )
-                {
-                    if ( array.size() != 1 )
-                        throw new ParamException(
-                            "can't mix unindexed and indexed params of type "
-                            +prefix);
-                    else
-                        params[0] = (String)map.get( array.get(i) );
-                }
-                else
-                {
-                    index = Integer.parseInt(number) - 1;
-                    if ( index < 0 || index >= array.size() )
-                        throw new ParamException("parameter index "
-                            +index+" out of range" );
-                    else
-                        params[index] = (String)map.get( array.get(i) );
-                }
-            }
-            // check for missing params
-            for ( int i=0;i<params.length;i++ )
-                if ( params[i] == null )
-                    throw new ParamException("missing param at index "+(i+1));
-        }
-        return params;
-    }
-    /**
      * Does one set of versions entirely contain another
      * @param container the putative container
      * @param contained the containee
@@ -339,82 +275,101 @@ public class FormatterGetHandler extends FormatterHandler
         return true;
     }
     /**
-     * Compute the IDs of spans of text in a set of versions
-     * @param corCodes the existing corCodes array
-     * @param mvd the MVD to use
-     * @param version1 versionID of the base version
-     * @param spec a comma-separated list of versionIDs 
-     * @return an updated corCodes array
+     * Return the length of the word starting at offset
+     * @param offset the index of the first letter
+     * @param text the whole text of this version
+     * @return the length of the word there
      */
-    String[] addMergeIds( String[] corCodes, MVD mvd, String version1, 
-        String spec )
+    int wordLen( int offset, String text )
     {
-        STILDocument doc = new STILDocument();
-        int base = mvd.getVersionByNameAndGroup(
-            Utils.getShortName(version1),
-            Utils.getGroupName(version1));
-        ArrayList<Pair> pairs = mvd.getPairs();
-        BitSet merged = mvd.convertVersions( spec );
-        int start = -1;
-        int len = 0;
-        int pos = 0;
-        int id = 1;
-        for ( int i=0;i<pairs.size();i++ )
+        int state = 0;
+        for ( int i=offset;i<text.length();i++ )
         {
-            Pair p = pairs.get( i );
-            if ( p.versions.nextSetBit(base)==base )
+            char token = text.charAt(i);
+            switch ( state )
             {
-                if ( containsVersions(p.versions,merged) )
-                {
-                    if ( start == -1 )
-                        start = pos;
-                    len += p.length();
-                }
-                else if ( start != -1 )
-                {
-                    // add range with annotation to doc
-                    try
-                    {
-                        // see diffs/default corform
-                        Range r = new Range("merged", start, len );
-                        r.addAnnotation( "mergeid", "v"+id );
-                        id++;
-                        doc.add( r );
-                        start = -1;
-                        len = 0;
-                    }
-                    catch ( Exception e )
-                    {
-                        // ignore it: we just failed to add that range
-                        start = -1;
-                        len = 0;
-                    }
-                }
-                // the position within base
-                pos += p.length();
+                case 0: // seen one letter
+                    if ( Character.isWhitespace(token) )
+                        return i-offset;
+                    else if ( token== '\'' || token == '’'||token == '-' )
+                        state = 1;
+                    else if ( token=='s' )
+                        state = 2;
+                    break;
+                case 1: // seen apostrophe
+                    if ( Character.isWhitespace(token) )
+                        return (i-1)-offset;
+                    if ( Character.isLetter(token) )
+                        state = 0;
+                    break;
+                case 2: // seen 's'
+                    if ( token=='\''||token == '’' )
+                        state = 3;
+                    else if ( Character.isLetter(token)||token=='-' )
+                        state = 0;
+                    else 
+                        return i-offset;
+                    break;
+                case 3:
+                    if ( Character.isWhitespace(token) )
+                        return i-offset;
+                    else if ( Character.isLetter(token) )
+                        state = 0;
+                    else
+                        return (i-1)-offset;
+                    break;
             }
         }
-        // coda: in case we have a part-fulfilled range
-        if ( start != -1 )
+        return text.length()-offset;
+    }
+    /**
+     * Convert the selections parameter to a real corcode
+     * @param text the whole text of this version
+     * @return a corcode as a string containing the selection ranges
+     */
+    String selectionsToCorcode( String text )
+    {
+        String[] parts = selections.split(",");
+        STILDocument cc = new STILDocument();
+        int[] values = new int[parts.length];
+        for ( int i=0;i<parts.length;i++ )
+            values[i] = Integer.parseInt(parts[i]);
+        Arrays.sort( values );
+        for ( int i=0;i<values.length;i++ )
         {
-            try
-            {
-                Range r = new Range("merged", start, len );
-                r.addAnnotation( "mergeid", "v"+id );
-                id++;
-                doc.add( r );
-            }
-            catch ( Exception e )
-            {
-                // ignore it: we just failed to add that range
-            }
+            int len = wordLen(values[i],text);
+            Range r = new Range( "selected", values[i], len );
+            cc.add( r );
         }
-        // add new CorCode to the set
-        String[] newCCs = new String[corCodes.length+1];
-        newCCs[newCCs.length-1] = doc.toString();
-        for ( int i=0;i<corCodes.length;i++ )
-            newCCs[i] = corCodes[i];
-        return newCCs;
+        cc.put(JSONKeys.STYLE,"TEI/default");
+        return cc.toJSONString();
+    }
+    /**
+     * Turn a list of corcode names into an actual list of corcodes
+     * @param names the docids of the corcodes
+     * @param styleNames an array of style names to augment
+     * @param text the text of the version
+     * @return an array of actual corcodes
+     * @throws FormatterException 
+     */
+    String[] fetchCorcodes( ArrayList names, ArrayList styleNames, String text ) 
+        throws FormatterException
+    {
+        ArrayList<String> list = new ArrayList<String>();
+        for ( int i=0;i<names.size();i++ )
+        {
+            EcdosisVersion hv = doGetResourceVersion( Database.CORCODE, 
+                (String)names.get(i), version1 );
+            if ( !styleNames.contains(hv.getStyle()) )
+                styleNames.add( hv.getStyle() );
+            list.add(new String(hv.getVersion()));
+        }
+        // add selections
+        if ( selections != null && selections.length()>0 )
+            list.add( selectionsToCorcode(text) );
+        String[] corcodes = new String[list.size()];
+        list.toArray(corcodes);
+        return corcodes;
     }
     /**
      * Format the requested URN version as HTML
@@ -427,104 +382,57 @@ public class FormatterGetHandler extends FormatterHandler
         HttpServletResponse response, String urn )
         throws FormatterException
     {
-        String version1 = request.getParameter( Params.VERSION1 );
+        version1 = request.getParameter( Params.VERSION1 );
         if ( version1 == null )
+            throw new FormatterException( "version1 parameter required" );
+        docid = request.getParameter(Params.DOCID);
+        selections = request.getParameter(Params.SELECTIONS);
+        EcdosisVersion corTex = doGetResourceVersion( 
+            Database.CORTEX, docid, version1 );
+        ArrayList<String> ccNames = new ArrayList<String>();
+        Map map = request.getParameterMap();
+        if ( map.containsKey(Params.CORCODE) )
         {
-            try
-            {
-                response.getWriter().println(
-                    "<p>version1 parameter required</p>");
-            }
-            catch ( Exception e )
-            {
-                throw new FormatterException( e );
-            }
+            String[] values = (String[])map.get(Params.CORCODE);
+            for ( int i=0;i<values.length;i++ )
+                ccNames.add( values[i]);
         }
         else
+            ccNames.add( docid+"/default");
+        ArrayList<String> styleNames = new ArrayList<String>();
+        if ( map.containsKey(Params.STYLE) )
         {
-            String selectedVersions = request.getParameter( 
-                Params.SELECTED_VERSIONS );
-            //System.out.println("version1="+version1);
-            AeseVersion corTex = doGetResourceVersion( Database.CORTEX, urn, version1 );
-            // 1. get corcodes and styles
-            Map map = request.getParameterMap();
-            String[] corCodes = getEnumeratedParams( Params.CORCODE, map, true );
-            String[] styles = getEnumeratedParams( Params.STYLE, map, false );
-            HashSet<String> styleSet = new HashSet<String>();
-            for ( int i=0;i<styles.length;i++ )
-                styleSet.add( styles[i] );
+            String[] values = (String[])map.get(Params.STYLE);
+            for ( int i=0;i<values.length;i++ )
+                styleNames.add( values[i]);
+        }
+        else
+            styleNames.add( corTex.getStyle() );
+        String text = corTex.getVersionString();
+        String[] corcodes = fetchCorcodes( ccNames, styleNames, text );
+        String[] styles = fetchStyles( styleNames );
+        // call the native library to format it
+        JSONResponse html = new JSONResponse(JSONResponse.HTML);
+        // String text, String[] markup, String[] css, JSONResponse output 
+        int res = new AeseFormatter().format( 
+            text, corcodes, styles, html );
+        if ( res == 0 )
+            throw new NativeException("formatting failed");
+        else
+        {
+            response.setContentType("text/html;charset=UTF-8");
             try
             {
-                for ( int i=0;i<corCodes.length;i++ )
-                {
-                    String ccResource = Utils.canonisePath(urn,corCodes[i]);
-                    AeseVersion hv = doGetResourceVersion( Database.CORCODE, 
-                        ccResource, version1 );
-                    Comment comment = new Comment();
-                    comment.addText( "version-length: "+hv.getVersionLength() );
-                    response.setCharacterEncoding("UTF-8");
-                    response.getWriter().println( comment.toString() );
-                    styleSet.add( hv.getStyle() );
-                    corCodes[i] = new String(hv.getVersion());
-                }
+                Comment comment = new Comment();
+                comment.addText( "styles: ");
+                for ( int i=0;i<styles.length;i++ )
+                    comment.addText( styles[i] );
+                response.getWriter().println( comment.toString() );
+                response.getWriter().println(html.getBody());   
             }
             catch ( Exception e )
             {
-                // this won't ever happen because UTF-8 is always supported
                 throw new FormatterException( e );
-            }
-            // 2. add mergeids if needed
-            if ( selectedVersions != null && selectedVersions.length()>0 )
-            {
-                corCodes = addMergeIds( corCodes, corTex.getMVD(), version1, 
-                    selectedVersions );
-                styleSet.add( "diffs/default" );
-            }
-            // 3. recompute styles array (docids)
-            styles = new String[styleSet.size()];
-            styleSet.toArray( styles );
-            // 4. convert style names to actual corforms
-            styles = fetchStyles( styles );
-            // 5. call the native library to format it
-            JSONResponse html = new JSONResponse(JSONResponse.HTML);
-            String text = corTex.getVersionString();
-    //        // debug
-//            try{
-//                String textString = new String(text,"UTF-8");
-//                System.out.println(textString);
-//            }catch(Exception e){}
-            // end
-//            if ( text.length==30712 )
-//            {
-//                try
-//                {
-//                    String textStr = new String( text, "UTF-8");
-//                    System.out.println(textStr );
-//                }
-//                catch ( Exception e )
-//                {
-//                }
-//            }
-            int res = new AeseFormatter().format( 
-                text, corCodes, styles, html );
-            if ( res == 0 )
-                throw new NativeException("formatting failed");
-            else
-            {
-                response.setContentType("text/html;charset=UTF-8");
-                try
-                {
-                    Comment comment = new Comment();
-                    comment.addText( "styles: ");
-                    for ( int i=0;i<styles.length;i++ )
-                        comment.addText( styles[i] );
-                    response.getWriter().println( comment.toString() );
-                    response.getWriter().println(html.getBody());   
-                }
-                catch ( Exception e )
-                {
-                    throw new FormatterException( e );
-                }
             }
         }
     }

@@ -54,9 +54,9 @@ public class JettyServer extends AbstractHandler
      */
     @Override
     public void handle(String target,
-                       Request baseRequest,
-                       HttpServletRequest request,
-                       HttpServletResponse response) 
+        Request baseRequest,
+        HttpServletRequest request,
+        HttpServletResponse response) 
         throws IOException, ServletException
     {
         response.setStatus(HttpServletResponse.SC_OK);

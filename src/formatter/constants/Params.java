@@ -51,4 +51,6 @@ public class Params {
     /** passed-in form param base name for corforms */
     public final static String CORFORM = "CORFORM";
     public final static String DOCID = "docid";
+    /* ranges that are "selected" */
+    public final static String SELECTIONS = "selections";
 }

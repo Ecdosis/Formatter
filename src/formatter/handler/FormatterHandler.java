@@ -24,6 +24,7 @@ import calliope.core.constants.JSONKeys;
 import calliope.core.database.Connector;
 import formatter.exception.FormatterException;
 import formatter.path.Path;
+import java.util.ArrayList;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.nio.charset.Charset;
@@ -79,6 +80,12 @@ abstract public class FormatterHandler
             throw new FormatterException( e );
         }
     }
+    /**
+     * Get a CSS style resource
+     * @param style
+     * @return
+     * @throws FormatterException 
+     */
     protected static String fetchStyle( String style ) throws FormatterException
     {
         // 1. try to get each literal style name
@@ -105,12 +112,12 @@ abstract public class FormatterHandler
      * @return an array of database contents for those ids
      * @throws a AeseException only if the database is not set up
      */
-    protected String[] fetchStyles( String[] styles ) throws FormatterException
+    protected String[] fetchStyles( ArrayList names ) throws FormatterException
     {
-        String[] actual = new String[styles.length];
-        for ( int i=0;i<styles.length;i++ )
+        String[] actual = new String[names.size()];
+        for ( int i=0;i<names.size();i++ )
         {
-            actual[i] = fetchStyle( styles[i] );
+            actual[i] = fetchStyle( (String)names.get(i) );
         }
         return actual;
     }
