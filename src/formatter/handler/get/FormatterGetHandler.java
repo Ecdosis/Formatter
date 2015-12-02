@@ -283,6 +283,7 @@ public class FormatterGetHandler extends FormatterHandler
     int wordLen( int offset, String text )
     {
         int state = 0;
+        int lastLetterPos=offset;
         for ( int i=offset;i<text.length();i++ )
         {
             char token = text.charAt(i);
@@ -291,12 +292,19 @@ public class FormatterGetHandler extends FormatterHandler
                 case 0: // seen one letter
                     if ( Character.isWhitespace(token) )
                         return i-offset;
-                    else if ( token== '\'' || token == '’'||token == '-' )
+                    else if ( token== '\'' || token == '’')
                         state = 1;
+                    else if ( token=='-' )
+                    {
+                        lastLetterPos = i;
+                        state = 4;
+                    }
                     else if ( token=='s' )
                         state = 2;
+                    else if ( !Character.isLetter(token) )
+                        return i-offset;
                     break;
-                case 1: // seen apostrophe
+                case 1: // seen apostrophe or hyphen
                     if ( Character.isWhitespace(token) )
                         return (i-1)-offset;
                     if ( Character.isLetter(token) )
@@ -318,6 +326,21 @@ public class FormatterGetHandler extends FormatterHandler
                     else
                         return (i-1)-offset;
                     break;
+                case 4: // seen hyphen
+                    if ( Character.isWhitespace(token) )
+                        state = 5;
+                    else if ( Character.isLetter(token) )
+                        state = 0;
+                    else
+                        return lastLetterPos-offset;
+                    break;
+                case 5: // seen hyphen and white space
+                    if ( Character.isLetter(token) )
+                        state = 0;
+                    else if ( !Character.isWhitespace(token) )
+                        return lastLetterPos-i;
+                    /// else stay in this state
+                    break;
             }
         }
         return text.length()-offset;
@@ -338,6 +361,7 @@ public class FormatterGetHandler extends FormatterHandler
         for ( int i=0;i<values.length;i++ )
         {
             int len = wordLen(values[i],text);
+            System.out.println("len="+len);
             Range r = new Range( "selected", values[i], len );
             cc.add( r );
         }
