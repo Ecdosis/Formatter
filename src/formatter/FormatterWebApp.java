@@ -26,6 +26,7 @@ import calliope.core.exception.CalliopeException;
 import calliope.core.exception.CalliopeExceptionMessage;
 import java.util.Enumeration;
 import formatter.handler.*;
+import formatter.handler.post.*;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -119,6 +120,8 @@ public class FormatterWebApp extends HttpServlet
             FormatterHandler handler;
             if ( method.equals("GET") )
                 handler = new FormatterGetHandler();
+            else if ( method.equals("POST") )
+                handler = new FormatterPostHandler();
             else
                 throw new FormatterException("Unknown http method "+method);
             resp.setStatus(HttpServletResponse.SC_OK);

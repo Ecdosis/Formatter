@@ -46,6 +46,8 @@ import html.Comment;
 import java.util.BitSet;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
+import java.io.File;
+import java.io.FileWriter;
 
 /**
  * Get a project document from the database
@@ -71,6 +73,12 @@ public class FormatterGetHandler extends FormatterHandler
                 else if ( prefix.equals(Service.TABLE) )
                 {
                     new TableHandler().handle(request,response,Path.pop(urn));
+                }
+                else if ( prefix.equals(Service.VERSION1) )
+                    new Version1Handler().handle(request,response,Utils.pop(urn));
+                else if ( prefix.equals(Service.METADATA) )
+                {
+                    new MetadataHandler().handle(request,response,Path.pop(urn));
                 }
                 else
                     handleGetVersion( request, response, urn );
@@ -223,6 +231,7 @@ public class FormatterGetHandler extends FormatterHandler
                 String sName = Utils.getShortName(vPath);
                 String gName = Utils.getGroupName(vPath);
                 int vId = mvd.getVersionByNameAndGroup(sName, gName );
+                //System.out.println("vId="+vId+" sName="+sName);
                 version.setMVD(mvd);
                 if ( vId != 0 )
                 {
@@ -395,6 +404,23 @@ public class FormatterGetHandler extends FormatterHandler
         list.toArray(corcodes);
         return corcodes;
     }
+    private void dumpText( String fileName, String text )
+    {
+        try
+        {
+            File textFile = new File(fileName);
+            if ( textFile.exists() )
+                textFile.delete();
+            textFile.createNewFile();
+            FileWriter fw = new FileWriter(textFile);
+            fw.write(text);
+            fw.close();
+        }
+        catch ( Exception e )
+        {
+            // ignore
+        }
+    }
     /**
      * Format the requested URN version as HTML
      * @param request the original http request
@@ -434,12 +460,40 @@ public class FormatterGetHandler extends FormatterHandler
             styleNames.add( corTex.getStyle() );
         String text = corTex.getVersionString();
         String[] corcodes = fetchCorcodes( ccNames, styleNames, text );
+        //System.out.println("Fetching corcodes");
         String[] styles = fetchStyles( styleNames );
         // call the native library to format it
         JSONResponse html = new JSONResponse(JSONResponse.HTML);
         // String text, String[] markup, String[] css, JSONResponse output 
-        int res = new AeseFormatter().format( 
-            text, corcodes, styles, html );
+        boolean ok = true;
+        if ( corcodes == null || corcodes.length==0 )
+        {
+            System.out.println("corcodes is null or empty");
+            ok = false;
+        }
+        if ( text == null||text.length()==0 )
+        {
+            System.out.println("text is null or empty");
+            ok = false;
+        }
+        if ( styles==null || styles.length==0 )
+        {
+            System.out.println("styles is null or empty");
+            ok = false;
+        }
+        int res = 0;
+        if ( ok )
+        {
+            if ( docid.equals("english/harpur/h694") )
+            {
+                dumpText("/tmp/h694.txt",text);
+                dumpText("/tmp/h694-default.json",corcodes[0]);
+            }
+            res = new AeseFormatter().format( text, corcodes, styles, html );
+        }
+//        for ( int k=0;k<corcodes.length;k++ )
+//            System.out.println(corcodes[k]);
+//        System.out.println("res="+res+" corcodes.length="+corcodes.length);
         if ( res == 0 )
             throw new NativeException("formatting failed");
         else

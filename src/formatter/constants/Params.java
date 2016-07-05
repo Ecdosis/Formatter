@@ -29,7 +29,7 @@ public class Params {
     /** name of list dropdowns etc */
     public final static String NAME = "NAME";
     /** ID of select version list */
-    public final static String LIST_ID = "LIST_ID";
+    public final static String LISTID = "listid";
     /** offset into a version */
     public final static String OFFSET = "OFFSET";
     /** length of a range in the given version */
@@ -53,4 +53,5 @@ public class Params {
     public final static String DOCID = "docid";
     /* ranges that are "selected" */
     public final static String SELECTIONS = "selections";
+    public final static String USERDATA = "userdata";
 }

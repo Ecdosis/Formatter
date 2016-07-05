@@ -27,4 +27,8 @@ public class Service {
     public static final String LIST = "list";
     /** display variant table */
     public static String TABLE = "table";
+    /** version metadata */
+    public static String METADATA = "metadata";
+    /** version1 default version */
+    public static String VERSION1 = "version1";
 }
