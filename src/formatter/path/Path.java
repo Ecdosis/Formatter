@@ -16,7 +16,7 @@
 package formatter.path;
 import formatter.Test;
 import java.util.StringTokenizer;
-import calliope.exception.AeseException;
+import calliope.core.exception.CalliopeException;
 import calliope.core.constants.Database;
 
 /**
@@ -39,7 +39,7 @@ public class Path implements Test
      * Construct the path simply
      * @param path a URN
      */
-    public Path( String urn ) throws AeseException
+    public Path( String urn ) throws CalliopeException
     {
         StringTokenizer st = new StringTokenizer( urn, "/" );
         this.name = st.nextToken();

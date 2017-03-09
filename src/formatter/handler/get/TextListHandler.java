@@ -18,7 +18,7 @@
 package formatter.handler.get;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import calliope.exception.*;
+import calliope.core.exception.*;
 import calliope.core.constants.Database;
 import calliope.core.handler.EcdosisMVD;
 import formatter.constants.Params;
@@ -39,7 +39,7 @@ public class TextListHandler extends FormatterGetHandler
      * @param row
      * @return 
      */
-    private String getVersionPath( String row ) throws AeseException
+    private String getVersionPath( String row ) throws CalliopeException
     {
         StringBuilder sb = new StringBuilder();
         String[] cols = row.split("\t");
@@ -72,7 +72,7 @@ public class TextListHandler extends FormatterGetHandler
             return sb.toString();
         }
         else
-            throw new AeseException("wrong number of columns: "+cols.length);
+            throw new CalliopeException("wrong number of columns: "+cols.length);
     }
     /**
      * Format the raw table from the database into plain text: each version 
@@ -81,7 +81,7 @@ public class TextListHandler extends FormatterGetHandler
      * @param rawTable the raw table tabbed and with CRs
      * @return comma-separated list of versions
      */
-    private String formatTable( String rawTable ) throws AeseException
+    private String formatTable( String rawTable ) throws CalliopeException
     {
         StringBuilder sb = new StringBuilder();
         String[] lines = rawTable.split("\n");
@@ -106,13 +106,13 @@ public class TextListHandler extends FormatterGetHandler
             if ( urn.length()>0 )
             {
                 EcdosisMVD mvd = loadMVD( Database.CORTEX, urn );
-                String table = mvd.mvd.getVersionTable();
+                String table = mvd.getVersionTable();
                 response.setContentType("text/plain;charset=UTF-8");
                 String list = formatTable( table );
                 response.getWriter().println( list );
             }
             else
-                throw new AeseException("Invalid path "+urn);
+                throw new CalliopeException("Invalid path "+urn);
         }
         catch ( Exception e )
         {

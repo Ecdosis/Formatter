@@ -31,4 +31,5 @@ public class Service {
     public static String METADATA = "metadata";
     /** version1 default version */
     public static String VERSION1 = "version1";
+    public static String SHORTLIST ="shortlist";
 }

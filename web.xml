@@ -20,5 +20,5 @@
         <servlet-name>FormatterWebApp</servlet-name>
         <url-pattern>/*</url-pattern>
     </servlet-mapping>
-
+    <absolute-ordering />
 </web-app>

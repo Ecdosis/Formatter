@@ -120,7 +120,7 @@ public class TableHandler extends FormatterGetHandler
             String baseVersion=null;
             EcdosisMVD mvd = loadMVD( Database.CORTEX, urn );
             if ( selectedVersions.equals(ALL) )
-                baseVersion = mvd.version1;  
+                baseVersion = mvd.getDefaultVersion();  
             else
             {
                 String[] parts = selectedVersions.split(",");
@@ -138,7 +138,7 @@ public class TableHandler extends FormatterGetHandler
                 else
                     shortName = baseVersion;
             }
-            this.base = (short)mvd.mvd.getVersionByNameAndGroup( shortName, 
+            this.base = (short)mvd.getVersionByNameAndGroup( shortName, 
                 groups );
             if ( base == 0 )
             {
@@ -146,7 +146,7 @@ public class TableHandler extends FormatterGetHandler
                     +groups+" not found. Substituting 1");
                 base = 1;
             }
-            String table = mvd.mvd.getTableView( base,offset,length,
+            String table = mvd.getTableView( base,offset,length,
                 compact,hideMerged,wholeWords,selectedVersions,firstID,
                 "apparatus" );
             response.setContentType("text/html;charset=UTF-8");

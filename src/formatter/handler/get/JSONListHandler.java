@@ -17,7 +17,7 @@
  */
 package formatter.handler.get;
 
-import calliope.exception.AeseException;
+import calliope.core.exception.CalliopeException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import formatter.exception.FormatterException;
@@ -111,7 +111,7 @@ public class JSONListHandler  extends TextListHandler
                 response.getWriter().println( list );
             }
             else
-                throw new AeseException("Invalid path "+urn);
+                throw new CalliopeException("Invalid path "+urn);
         }
         catch ( Exception e )
         {

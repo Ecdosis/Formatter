@@ -33,19 +33,23 @@ import calliope.core.constants.Database;
 import calliope.core.constants.Formats;
 import calliope.core.constants.JSONKeys;
 import calliope.core.handler.EcdosisMVD;
-import calliope.exception.AeseException;
+import calliope.core.exception.JSONException;
 import calliope.json.JSONResponse;
-import calliope.json.corcode.Range;
-import calliope.json.corcode.STILDocument;
+import calliope.core.json.corcode.Range;
+import calliope.core.json.corcode.STILDocument;
 import edu.luc.nmerge.mvd.MVD;
 import edu.luc.nmerge.mvd.MVDFile;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Arrays;
+import java.util.Set;
+import java.util.Iterator;
 import html.Comment;
 import java.util.BitSet;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
+import org.json.simple.JSONArray;
 import java.io.File;
 import java.io.FileWriter;
 
@@ -66,7 +70,11 @@ public class FormatterGetHandler extends FormatterHandler
             urn = Utils.pop(urn);
             if ( prefix != null )
             {
-                if ( prefix.equals(Service.LIST))
+                if ( prefix.equals(Service.SHORTLIST) )
+                {
+                    new ShortListHandler().handle(request,response, Path.pop(urn));
+                }
+                else if ( prefix.equals(Service.LIST))
                 {
                     new ListHandler().handle(request,response,Path.pop(urn));
                 }
@@ -131,11 +139,13 @@ public class FormatterGetHandler extends FormatterHandler
         try
         {
             JSONObject doc = loadJSONDocument( Database.CORTEX, urn );
+            if ( doc == null )
+                throw new Exception("No doc found for "+urn);
             String fmt = (String)doc.get(JSONKeys.FORMAT);
             if ( fmt != null && fmt.startsWith(Formats.MVD) )
             {
                 EcdosisMVD mvd = loadMVD( Database.CORTEX, urn );
-                return mvd.mvd.getVersionTable();
+                return mvd.getVersionTable();
             }
             else if ( fmt !=null && fmt.equals(Formats.TEXT) )
             {
@@ -164,6 +174,145 @@ public class FormatterGetHandler extends FormatterHandler
         }   
     }
     /**
+     * Collapse all layer version into their parent version
+     * @param jStr the full table uncompressed
+     * @return a compressed JSON table of versions
+     */
+    private String compactTable( String jStr )
+    {
+        JSONObject jObj = (JSONObject)JSONValue.parse(jStr);
+        JSONObject res = new JSONObject();
+        JSONArray resVersions = new JSONArray();
+        res.put("versions",resVersions);
+        res.put("description",(String)jObj.get("description"));
+        HashMap<String,ArrayList<JSONObject>> map = 
+            new HashMap<String,ArrayList<JSONObject>>();
+        JSONArray jArr = (JSONArray)jObj.get("versions");
+        for ( int i=0;i<jArr.size();i++ )
+        {
+            JSONObject tuple = (JSONObject)jArr.get(i);
+            String groups = (String)tuple.get("groupPath");
+            ArrayList list = map.get(groups);
+            if ( list == null )
+            {
+                list = new ArrayList<JSONObject>();
+                map.put(groups,list);
+            }
+            list.add(tuple);
+        }
+        Set<String> keys = map.keySet();
+        Iterator<String> iter = keys.iterator();
+        while ( iter.hasNext() )
+        {
+            String key = iter.next();
+            ArrayList<JSONObject> list = map.get(key);
+            boolean hasLayers = true;
+            for ( int i=0;i<list.size();i++ )
+            {
+                JSONObject obj = list.get(i);
+                String shortName = (String)obj.get("shortName");
+                if ( !shortName.contains("layer-") )
+                {
+                    hasLayers = false;
+                    break;
+                }
+            }
+            if ( hasLayers )
+            {
+                JSONObject tuple = new JSONObject();
+                JSONObject first = list.get(0);
+                tuple.put("longName",first.get("longName"));
+                String gp = (String)first.get("groupPath");
+                int index = gp.lastIndexOf("/");
+                if ( index != -1 )
+                {
+                    String shortName = gp.substring(index+1);
+                    gp = gp.substring(0,index+1);
+                    tuple.put("groupPath",gp);
+                    tuple.put("shortName",shortName);
+                    resVersions.add(tuple);
+                }
+                if ( !res.containsKey("hasLayers") )
+                    res.put("hasLayers",true);
+            }
+            else
+            {
+                jObj.put("hasLayers",false);
+                res = jObj;
+                break;
+            }
+        }
+        return res.toJSONString().replaceAll("\\\\/","/");
+    }
+    protected String getShortVersionTableForUrn( String urn ) 
+        throws FormatterException
+    {
+        try
+        {
+            JSONObject doc = loadJSONDocument( Database.CORTEX, urn );
+            String fmt = (String)doc.get(JSONKeys.FORMAT);
+            if ( fmt != null && fmt.startsWith(Formats.MVD) )
+            {
+                EcdosisMVD mvd = loadMVD( Database.CORTEX, urn );
+                MVD m = mvd.getMVD();
+                String jStr = m.getJSONVersionTable();
+                return compactTable(jStr);
+            }
+            else if ( fmt !=null && fmt.equals(Formats.TEXT) )
+            {
+                // concoct a version list of length 1
+                JSONObject jObj = new JSONObject();
+                String description = (String) doc.get(JSONKeys.DESCRIPTION);
+                String title = (String) doc.get(JSONKeys.TITLE);
+                if ( description.length()>0 )
+                    jObj.put(JSONKeys.DESCRIPTION,description);
+                else
+                    jObj.put(JSONKeys.DESCRIPTION,title);
+                JSONArray jArr = new JSONArray();
+                jObj.put( "versions", jArr);
+                JSONObject jObj2 = new JSONObject();
+                String version1 = (String)doc.get(JSONKeys.VERSION1);
+                if ( version1 == null )
+                    version1 = urn;
+                String [] parts = version1.split("/");
+                String shortName = version1;
+                boolean hasLayers = false;
+                for ( int i=parts.length-1;i>=0;i-- )
+                {
+                    if ( parts[i].contains("layer-") )
+                    {
+                        hasLayers=true;
+                        continue;
+                    }
+                    else
+                    {
+                        shortName = parts[i];
+                        break;
+                    }
+                }
+                jObj.put("hasLayers",hasLayers);
+                jObj2.put("shortName",shortName);
+                String longName = "Version "+urn;
+                int index = version1.indexOf(shortName);
+                if ( index == -1 )
+                    index = version1.length();
+                String groups = version1.substring(0,index);
+                if ( doc.containsKey("longName") )
+                   longName =  (String)doc.get("longName");
+                jObj2.put("longName",longName);
+                jObj2.put("groupPath",groups);
+                jArr.add(jObj2);
+                return jObj.toJSONString().replaceAll("\\\\/","/");
+            }
+            else
+                throw new FormatterException("Unknown of null Format");
+        }
+        catch ( Exception e )
+        {
+            throw new FormatterException(e);
+        }   
+    }
+    /**
      * Use this method to retrieve the doc just to see its format
      * @param db the database to fetch from
      * @param docID the doc's ID
@@ -176,7 +325,7 @@ public class FormatterGetHandler extends FormatterHandler
         try
         {
             String data = Connector.getConnection().getFromDb(db,docID);
-            if ( data.length() > 0 )
+            if ( data != null && data.length() > 0 )
             {
                 JSONObject doc = (JSONObject)JSONValue.parse(data);
                 if ( doc != null )
@@ -359,7 +508,7 @@ public class FormatterGetHandler extends FormatterHandler
      * @param text the whole text of this version
      * @return a corcode as a string containing the selection ranges
      */
-    String selectionsToCorcode( String text )
+    String selectionsToCorcode( String text ) throws JSONException
     {
         String[] parts = selections.split(",");
         STILDocument cc = new STILDocument();
@@ -388,21 +537,28 @@ public class FormatterGetHandler extends FormatterHandler
     String[] fetchCorcodes( ArrayList names, ArrayList styleNames, String text ) 
         throws FormatterException
     {
-        ArrayList<String> list = new ArrayList<String>();
-        for ( int i=0;i<names.size();i++ )
+        try
         {
-            EcdosisVersion hv = doGetResourceVersion( Database.CORCODE, 
-                (String)names.get(i), version1 );
-            if ( !styleNames.contains(hv.getStyle()) )
-                styleNames.add( hv.getStyle() );
-            list.add(new String(hv.getVersion()));
+            ArrayList<String> list = new ArrayList<String>();
+            for ( int i=0;i<names.size();i++ )
+            {
+                EcdosisVersion hv = doGetResourceVersion( Database.CORCODE, 
+                    (String)names.get(i), version1 );
+                if ( !styleNames.contains(hv.getStyle()) )
+                    styleNames.add( hv.getStyle() );
+                list.add(new String(hv.getVersion()));
+            }
+            // add selections
+            if ( selections != null && selections.length()>0 )
+                list.add( selectionsToCorcode(text) );
+            String[] corcodes = new String[list.size()];
+            list.toArray(corcodes);
+            return corcodes;
         }
-        // add selections
-        if ( selections != null && selections.length()>0 )
-            list.add( selectionsToCorcode(text) );
-        String[] corcodes = new String[list.size()];
-        list.toArray(corcodes);
-        return corcodes;
+        catch ( JSONException je )
+        {
+            throw new FormatterException(je);
+        }
     }
     private void dumpText( String fileName, String text )
     {
@@ -448,7 +604,10 @@ public class FormatterGetHandler extends FormatterHandler
                 ccNames.add( values[i]);
         }
         else
+        {
             ccNames.add( docid+"/default");
+            ccNames.add( docid+"/pages");
+        }
         ArrayList<String> styleNames = new ArrayList<String>();
         if ( map.containsKey(Params.STYLE) )
         {
@@ -484,16 +643,8 @@ public class FormatterGetHandler extends FormatterHandler
         int res = 0;
         if ( ok )
         {
-            if ( docid.equals("english/harpur/h694") )
-            {
-                dumpText("/tmp/h694.txt",text);
-                dumpText("/tmp/h694-default.json",corcodes[0]);
-            }
             res = new AeseFormatter().format( text, corcodes, styles, html );
         }
-//        for ( int k=0;k<corcodes.length;k++ )
-//            System.out.println(corcodes[k]);
-//        System.out.println("res="+res+" corcodes.length="+corcodes.length);
         if ( res == 0 )
             throw new NativeException("formatting failed");
         else

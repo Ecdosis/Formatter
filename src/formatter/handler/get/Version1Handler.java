@@ -95,17 +95,17 @@ public class Version1Handler extends MetadataHandler
                 JSONObject  jObj1 = null;
                 if ( res != null )
                 {
-                    System.out.println("found metadata for "+docid);
+                    //System.out.println("found metadata for "+docid);
                     jObj1 = (JSONObject)JSONValue.parse(res);
                     if ( jObj1.containsKey(JSONKeys.VERSION1) )
                     {
-                        System.out.println("found version1 in metadata");
+                        //System.out.println("found version1 in metadata");
                         metadataValue = (String) jObj1.get(JSONKeys.VERSION1);
                     }
                 }
                 if ( metadataValue == null )
                 {
-                    System.out.println("Getting version1 from cortex");
+                    //System.out.println("Getting version1 from cortex");
                     getMetadataFromCortex( conn );
                 }
             }
