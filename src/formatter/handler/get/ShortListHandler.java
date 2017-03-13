@@ -46,7 +46,7 @@ public class ShortListHandler extends FormatterGetHandler
         docid = request.getParameter( Params.DOCID );
         try
         {
-            String table = getShortVersionTableForUrn( docid );
+            String table = getVersionTableForUrn( docid, true );
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().println( table );
         }

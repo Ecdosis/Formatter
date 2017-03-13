@@ -22,6 +22,7 @@ import calliope.core.constants.Database;
 import calliope.core.constants.Formats;
 import calliope.core.constants.JSONKeys;
 import calliope.core.database.Connector;
+import calliope.core.handler.GetHandler;
 import formatter.exception.FormatterException;
 import formatter.path.Path;
 import java.util.ArrayList;
@@ -35,7 +36,7 @@ import org.json.simple.JSONValue;
  * Abstract super-class for all handlers: PUT, POST, DELETE, GET
  * @author ddos
  */
-abstract public class FormatterHandler 
+abstract public class FormatterHandler extends GetHandler
 {
     protected String encoding;
     protected String version1;
